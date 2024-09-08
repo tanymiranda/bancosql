@@ -1,47 +1,120 @@
-"use client";
+'use client';
+
+import { useEffect } from 'react';
 import { supabase } from '../../lib/supabaseClient';
-import { useEffect, useState } from 'react';
-import { faker } from '@faker-js/faker';
+// Interface para Pessoa
+interface Pessoa {
+  id?: number;
+  nome: string;
+  cpf: string;
+}
 
-const insertData = async () => {
-  // Inserir 100 pessoas
-  const pessoas = [];
-  for (let i = 0; i < 100; i++) {
-    pessoas.push({
-      nome: faker.person.firstName(),
-      idade: Math.floor(Math.random() * 50) + 18,
-      email: faker.internet.email()
-    });
-  }
-  const { error: pessoaInsertError } = await supabase.from('pessoa').insert(pessoas);
-  if (pessoaInsertError) console.error('Erro ao inserir dados na tabela pessoa:', pessoaInsertError);
+// Interface para Venda
+interface Venda {
+  id?: number;
+  pessoa_id: number;
+  valor: string;
+}
 
-  // Inserir 4000 vendas
-  const vendas = [];
-  for (let i = 0; i < 4000; i++) {
-    vendas.push({
-      cliente_id: Math.floor(Math.random() * 100) + 1, // ID aleatório de cliente
-      vendedor_id: Math.floor(Math.random() * 100) + 1, // ID aleatório de vendedor
-      quantidade: parseFloat((Math.random() * 100).toFixed(4)),
-      valor: parseFloat((Math.random() * 1000).toFixed(4)),
-      data: faker.date.recent({ days: 30 }).toISOString().split('T')[0] // Formato DATE
-    });
-  }
-  const { error: vendaInsertError } = await supabase.from('venda').insert(vendas);
-  if (vendaInsertError) console.error('Erro ao inserir dados na tabela venda:', vendaInsertError);
+// Função para gerar um nome aleatório
+const generateRandomName = (): string => {
+  const names = ['Tany', 'José', 'Carol', 'João', 'Ana', 'Bruno', 'Felipe', 'Camila', 'Taniely', 'Mônica'];
+  const surnames = ['Siqueira', 'Souza', 'Oliveira', 'Santos', 'Ferreira', 'Fernandes', 'Ribeiro', 'Cotrim', 'Miranda'];
+  const randomName = names[Math.floor(Math.random() * names.length)];
+  const randomSurname = surnames[Math.floor(Math.random() * surnames.length)];
+  return `${randomName} ${randomSurname}`;
 };
 
-export default function Page() {
-  const [status, setStatus] = useState('');
+// Função para gerar um CPF aleatório
+const generateCPF = (): string => {
+  const digits = Array.from({ length: 9 }, () => Math.floor(Math.random() * 10));
+  return `${digits.slice(0, 3).join('')}.${digits.slice(3, 6).join('')}.${digits.slice(6, 9).join('')}-${Math.floor(10 + Math.random() * 89)}`;
+};
 
+// Função para contar registros existentes
+const countRecords = async (table: string): Promise<number> => {
+  const { count, error } = await supabase
+    .from(table)
+    .select('*', { count: 'exact', head: true });
+
+  if (error) {
+    console.error(`Erro ao contar registros na tabela ${table}:`, error.message);
+    return 0;
+  }
+
+  return count || 0;
+};
+
+// Função para gerar e inserir 100 pessoas e 4000 vendas
+const insertData = async () => {
+  try {
+    // Contar pessoas e vendas já existentes
+    const pessoasCount = await countRecords('pessoa');
+    const vendasCount = await countRecords('venda');
+
+    // Limites
+    const maxPessoas = 100;
+    const maxVendas = 4000;
+
+    // Inserindo pessoas se não atingir o limite
+    if (pessoasCount < maxPessoas) {
+      for (let i = 0; i < maxPessoas - pessoasCount; i++) {
+        const pessoa: Pessoa = {
+          nome: generateRandomName(),
+          cpf: generateCPF(),
+        };
+
+        const { data: pessoaInserida, error: pessoaError } = await supabase
+          .from('pessoa')
+          .insert([pessoa])
+          .select();
+
+        if (pessoaError) {
+          console.error('Erro ao inserir pessoa:', pessoaError.message);
+          return;
+        }
+
+        const pessoaId = pessoaInserida?.[0]?.id;
+
+        if (!pessoaId) {
+          console.error('Pessoa inserida não possui ID');
+          return;
+        }
+
+        // Inserindo vendas se não atingir o limite de 4000 vendas
+        if (vendasCount < maxVendas) {
+          for (let j = 0; j < 40 && vendasCount + j < maxVendas; j++) {
+            const venda: Venda = {
+              pessoa_id: pessoaId,
+              valor: (Math.random() * 1000).toFixed(2),
+            };
+
+            const { error: vendaError } = await supabase
+              .from('venda')
+              .insert([venda]);
+
+            if (vendaError) {
+              console.error('Erro ao inserir venda:', vendaError.message);
+              return;
+            }
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Erro ao inserir dados:', error);
+  }
+};
+
+export default function Home() {
   useEffect(() => {
-    insertData()
-      .then(() => setStatus('Dados inseridos com sucesso!'))
-      .catch((error) => {
-        console.error('Erro ao inserir dados:', error);
-        setStatus('Erro ao inserir dados');
-      });
+    insertData();
   }, []);
 
-  return <div>{status}</div>;
+  return (
+    <div>
+      <h1></h1>
+      <p>Inserindo dados automaticamente...</p>
+    </div>
+  );
 }
