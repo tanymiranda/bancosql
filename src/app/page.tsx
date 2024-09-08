@@ -39,7 +39,10 @@ const generateCPF = (): string => {
 
 // Função para gerar um email aleatório baseado no nome
 const generateEmail = (name: string): string => {
-  return `${name.toLowerCase().replace(' ', '.')}@gmail.com`;
+  const domain = ['gmail.com', 'yahoo.com', 'hotmail.com'];
+  const randomDomain = domain[Math.floor(Math.random() * domain.length)];
+  const uniqueSuffix = Math.floor(1000 + Math.random() * 9000); // Garantir unicidade
+  return `${name.toLowerCase().replace(' ', '.')}+${uniqueSuffix}@${randomDomain}`;
 };
 
 // Função para gerar uma idade aleatória entre 18 e 65 anos
@@ -69,6 +72,21 @@ const countRecords = async (table: string): Promise<number> => {
   return count || 0;
 };
 
+// Função para verificar se o email já existe
+const emailExists = async (email: string): Promise<boolean> => {
+  const { data, error } = await supabase
+    .from('pessoa')
+    .select('id')
+    .eq('email', email);
+
+  if (error) {
+    console.error('Erro ao verificar email:', error.message);
+    return false;
+  }
+
+  return data?.length > 0;
+};
+
 // Função para gerar e inserir 100 pessoas e 4000 vendas
 const insertData = async () => {
   try {
@@ -83,11 +101,20 @@ const insertData = async () => {
     // Inserindo pessoas se não atingir o limite
     while (pessoasCount < maxPessoas) {
       const nome = generateRandomName();
+      const email = generateEmail(nome);
+
+      // Verificar se o email já está em uso
+      const emailJaExiste = await emailExists(email);
+      if (emailJaExiste) {
+        console.warn(`Email duplicado detectado: ${email}, gerando um novo...`);
+        continue; // Gerar nova pessoa e email
+      }
+
       const pessoa: Pessoa = {
         nome: nome,
         cpf: generateCPF(),
         idade: generateRandomAge(), // Gerando idade aleatória
-        email: generateEmail(nome) // Gerando email baseado no nome
+        email: email // Gerando email baseado no nome
       };
 
       const { data: pessoaInserida, error: pessoaError } = await supabase
@@ -145,7 +172,7 @@ export default function Home() {
 
   return (
     <div>
-      <h1></h1>
+      <h1>Inserção Automática</h1>
       <p>Inserindo dados automaticamente...</p>
     </div>
   );
